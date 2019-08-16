@@ -1,0 +1,104 @@
+---
+title: "Practical Machine Learning Week 4 Project"
+author: "David Wei"
+date: "8/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## introduction
+
+The goal of this project is to predict the manner (Variable: classe) in which they did the exercise,   using any of the other variables to predict with. 
+1. create a report describing how build models
+2. how use cross validation, 
+3. what is the expected out of sample error
+4. why is the model isselected 
+5. Use prediction model to predict 20 different test cases
+
+Get training and testing datasets. 
+
+```{r get data and load analysis package, echo=FALSE}
+library(caret);library(dplyr);library(e1071);library(elasticnet);library(rattle)
+tr0 = read.csv("pml-training.csv")
+te = read.csv("pml-testing.csv") 
+te <-te[,-1] 
+tr0 <-tr0[,-1] 
+
+```
+
+## Preprocessing the data.
+
+Both train  and test data have 159 variables, I do not an  expert about such excise data. Do not know which variables are more meaningful then others. After doing some data explore, find there are lots of vaariables have NA value. let's check how many of them and what's data look like after removing them.
+ 
+```{r NA variables, echo=FALSE}
+
+#find NA from test data;
+nse <- as.character()
+for (i in 1:ncol(te) ) {
+         if (sum(is.na(te[,i])==FALSE)==nrow(te)) {nse<- paste(nse,names(te)[i],sep = ",")}
+     }
+# remove variables which is missing in test from training data.
+tr1 <-tr0 %>%
+  select(user_name,raw_timestamp_part_1,raw_timestamp_part_2,cvtd_timestamp,new_window,num_window,roll_belt,pitch_belt,yaw_belt,total_accel_belt,gyros_belt_x,gyros_belt_y,gyros_belt_z,accel_belt_x,accel_belt_y,accel_belt_z,magnet_belt_x,magnet_belt_y,magnet_belt_z,roll_arm,pitch_arm,yaw_arm,total_accel_arm,gyros_arm_x,gyros_arm_y,gyros_arm_z,accel_arm_x,accel_arm_y,accel_arm_z,magnet_arm_x,magnet_arm_y,magnet_arm_z,roll_dumbbell,pitch_dumbbell,yaw_dumbbell,total_accel_dumbbell,gyros_dumbbell_x,gyros_dumbbell_y,gyros_dumbbell_z,accel_dumbbell_x,accel_dumbbell_y,accel_dumbbell_z,magnet_dumbbell_x,magnet_dumbbell_y,magnet_dumbbell_z,roll_forearm,pitch_forearm,yaw_forearm,total_accel_forearm,gyros_forearm_x,gyros_forearm_y,gyros_forearm_z,accel_forearm_x,accel_forearm_y,accel_forearm_z,magnet_forearm_x,magnet_forearm_y,magnet_forearm_z,classe)
+
+
+#Check how many NA variales in training dataset.
+nse1 <- as.character()
+for (i in 1:ncol(tr1) ) {
+  if (sum(is.na(tr1[,i])==FALSE)<nrow(tr1)) {nse1<- paste(nse,names(tr1)[i],sep = ",-")}
+}
+print(nse1)
+
+```
+## After removing NA variables, there are 59 vraibles non-missing variables left, looks much better than 159 vraibles. Split training data into train(70%) and validation data (30%)
+
+```{r build train and validation data}
+set.seed(12345) 
+ib <- createDataPartition(y=tr1$classe,p=0.7,list=F)
+tr <-tr1[ib, ]
+vv <-tr1[-ib, ] 
+```
+##build Model
+```{r models,cache=TRUE}
+
+m_gbm <- train(classe~., data=tr, method="gbm" )  
+m_rf  <- train(classe~., data=tr, method="rf" )
+m_rp  <- train(classe~., data=tr, method='rpart')
+ 
+  
+confusionMatrix(predict(m_gbm,newdata =vv),vv$classe)$overall['Accuracy']
+confusionMatrix(predict(m_rf, newdata =vv),vv$classe)$overall['Accuracy']
+confusionMatrix(predict(m_rp, newdata =vv),vv$classe)$overall['Accuracy']
+
+confusionMatrix(predict(m_gbm,newdata =tr),tr$classe)$overall['Accuracy']
+confusionMatrix(predict(m_rf, newdata =tr),tr$classe)$overall['Accuracy']
+confusionMatrix(predict(m_rp, newdata =tr),tr$classe)$overall['Accuracy']
+```
+
+Comparing the accuracy of these 3 modes, from highest to lowrest, they are RF, GBM and RAPRT, RPART accuracy is less than 0.5. It will use for final model.
+
+```{r Combine predictors,cache=TRUE}
+
+pre_gbm<-predict(m_gbm,newdata =tr)
+pre_rf <-predict(m_rf,newdata =tr)
+Pre_cb <-data.frame(pre_gbm,pre_rf,tr$classe)
+names(Pre_cb)[3]<-"classe"
+m_gam <-train(classe~., data=Pre_cb, method='gam')
+
+confusionMatrix(predict(m_gam,newdata =Pre_cb),tr$classe)$overall['Accuracy']
+
+pre_gbmv<-predict(m_gbm,newdata =vv)
+pre_rfv <-predict(m_rf,newdata =vv)
+Pre_cbv <-data.frame(pre_gbm=pre_gbmv,pre_rf=pre_rfv) 
+confusionMatrix(predict(m_gam,newdata =Pre_cbv),vv$classe)$overall['Accuracy']
+```
+Combined model has lower accuracy(<0.5), so the final model will be RF model.
+```{r final,echo = TRUE}
+
+pred_test <-predict(m_rf,newdata =te)
+print(pred_test)
+
+```
