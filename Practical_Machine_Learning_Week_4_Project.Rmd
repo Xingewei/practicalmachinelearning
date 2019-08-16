@@ -20,7 +20,7 @@ The goal of this project is to predict the manner (Variable: classe) in which th
 
 Get training and testing datasets. 
 
-```{r get data and load analysis package, echo=FALSE}
+```{r get data and load analysis package}
 library(caret);library(dplyr);library(e1071);library(elasticnet);library(rattle)
 tr0 = read.csv("pml-training.csv")
 te = read.csv("pml-testing.csv") 
@@ -33,7 +33,7 @@ tr0 <-tr0[,-1]
 
 Both train  and test data have 159 variables, I do not an  expert about such excise data. Do not know which variables are more meaningful then others. After doing some data explore, find there are lots of vaariables have NA value. let's check how many of them and what's data look like after removing them.
  
-```{r NA variables, echo=FALSE}
+```{r NA variables}
 
 #find NA from test data;
 nse <- as.character()
@@ -62,13 +62,15 @@ tr <-tr1[ib, ]
 vv <-tr1[-ib, ] 
 ```
 ##build Model
-```{r models,cache=TRUE}
+```{r models,cache=TRUE,echo = T, results = 'hide'}
 
 m_gbm <- train(classe~., data=tr, method="gbm" )  
 m_rf  <- train(classe~., data=tr, method="rf" )
 m_rp  <- train(classe~., data=tr, method='rpart')
- 
-  
+```
+
+## Check Models Accuracy, remove the the worst one from models.
+```{r Check Models Accuracy,cache=TRUE, results = 'asis'}  
 confusionMatrix(predict(m_gbm,newdata =vv),vv$classe)$overall['Accuracy']
 confusionMatrix(predict(m_rf, newdata =vv),vv$classe)$overall['Accuracy']
 confusionMatrix(predict(m_rp, newdata =vv),vv$classe)$overall['Accuracy']
@@ -80,14 +82,16 @@ confusionMatrix(predict(m_rp, newdata =tr),tr$classe)$overall['Accuracy']
 
 Comparing the accuracy of these 3 modes, from highest to lowrest, they are RF, GBM and RAPRT, RPART accuracy is less than 0.5. It will use for final model.
 
-```{r Combine predictors,cache=TRUE}
+```{r Combine predictors,cache=TRUE,results = 'hide'}
 
 pre_gbm<-predict(m_gbm,newdata =tr)
 pre_rf <-predict(m_rf,newdata =tr)
 Pre_cb <-data.frame(pre_gbm,pre_rf,tr$classe)
 names(Pre_cb)[3]<-"classe"
 m_gam <-train(classe~., data=Pre_cb, method='gam')
-
+```
+## Check Combined predictors model accuracy.
+```{r  Check Accuracy,cache=TRUE,results = 'asis'}
 confusionMatrix(predict(m_gam,newdata =Pre_cb),tr$classe)$overall['Accuracy']
 
 pre_gbmv<-predict(m_gbm,newdata =vv)
@@ -95,7 +99,7 @@ pre_rfv <-predict(m_rf,newdata =vv)
 Pre_cbv <-data.frame(pre_gbm=pre_gbmv,pre_rf=pre_rfv) 
 confusionMatrix(predict(m_gam,newdata =Pre_cbv),vv$classe)$overall['Accuracy']
 ```
-Combined model has lower accuracy(<0.5), so the final model will be RF model.
+##Combined model has lower accuracy(<0.5), so the final model will be RF model.
 ```{r final,echo = TRUE}
 
 pred_test <-predict(m_rf,newdata =te)
